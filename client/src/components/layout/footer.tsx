@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import logoImg from "@assets/viva-favicon.svg";
 import { useBranding } from "@/components/shared/branding-provider";
 import type { CmsMenu, MenuItem, PublicMenuLocation } from "@shared/schema";
+
+const logoImg = "/favicon.svg";
 
 const defaultFooterLinks = [
   { href: "/", label: "Home" },

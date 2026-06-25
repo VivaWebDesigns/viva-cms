@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ChevronDown, LayoutDashboard, LogOut, Menu, Shield, User, UserCog } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import logoImg from "@assets/viva-favicon.svg";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -16,6 +15,8 @@ import { useBranding } from "@/components/shared/branding-provider";
 import { UserProfileDialog } from "@/components/shared/user-profile-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import type { CmsMenu, MenuItem, PublicMenuLocation } from "@shared/schema";
+
+const logoImg = "/favicon.svg";
 
 const defaultNavLinks = [
   { label: "Home", href: "/" },

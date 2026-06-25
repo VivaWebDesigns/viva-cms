@@ -28,7 +28,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { UserProfileDialog } from "@/components/shared/user-profile-dialog";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import logoIcon from "@assets/viva-favicon.svg";
+
+const logoIcon = "/favicon.svg";
 
 interface NavItem {
   title: string;
