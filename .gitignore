@@ -1,0 +1,13 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+uploads
+attached_assets
+client/public/avatars
+cms-export.sql
+.env
+.env.*
+!.env.example

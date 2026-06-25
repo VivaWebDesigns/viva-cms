@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Viva CMS">
+  <rect width="512" height="512" rx="112" fill="#10233f"/>
+  <path d="M133 137h72l53 164 53-164h68L292 375h-72L133 137Z" fill="#f8f5ed"/>
+  <path d="M371 137c-42 8-78 29-106 62 7 20 14 40 20 60 23-49 56-83 101-101l-15-21Z" fill="#89cda1"/>
+  <circle cx="382" cy="138" r="17" fill="#f8f5ed"/>
+</svg>
