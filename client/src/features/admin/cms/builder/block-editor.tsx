@@ -95,12 +95,12 @@ const SECTION_STYLE_KEYS = new Set([
 
 const SECTION_SETTING_KEYS = new Set([
   ...SECTION_STYLE_KEYS,
-  "backgroundImageUrl",
-  "backgroundPositionX",
-  "backgroundPositionY",
-  "videoBackgroundUrl",
   "overlayColor",
   "overlayOpacity",
+  "gradientEnabled",
+  "gradientColor",
+  "gradientOpacity",
+  "gradientHeight",
   "layout",
   "minHeight",
 ]);
@@ -124,6 +124,8 @@ const IMAGE_POSITION_FIELD_GROUPS = [
 ];
 
 type InspectorGroup = "content" | "media" | "layout" | "settings";
+
+const INSPECTOR_GROUP_ORDER: InspectorGroup[] = ["content", "media", "settings", "layout"];
 
 const GROUP_METADATA: Record<InspectorGroup, { label: string; description: string }> = {
   content: {
@@ -377,6 +379,7 @@ function shouldRenderConditionalField(
 
 function defaultColorValueForKey(key: string) {
   if (key === "overlayColor" || key === "sectionBackgroundOverlayColor") return "#000000";
+  if (key === "gradientColor") return "#102234";
   return key === "sectionRadialGradientColor" ? DEFAULT_RADIAL_GRADIENT_COLOR : DEFAULT_COLOR_VALUE;
 }
 
@@ -526,7 +529,7 @@ function ArrayItemsField({
                     onCheckedChange={(checked) => updateItem(idx, field.key, checked)}
                     data-testid={`array-item-${idx}-${field.key}`}
                   />
-                  <span className="text-xs text-muted-foreground">{Boolean(item[field.key]) ? "Yes" : "No"}</span>
+                  <span className="text-xs text-muted-foreground">{item[field.key] ? "Yes" : "No"}</span>
                 </div>
               ) : field.type === "image-url" ? (
                 <CmsImageUpload
@@ -834,7 +837,7 @@ function PropField({
 
 export function BlockEditor({
   blockDef,
-  blockType,
+  blockType: _blockType,
   props,
   onChange,
   mode = "full",
@@ -859,7 +862,7 @@ export function BlockEditor({
     return groups;
   }, [orderedPropDefs]);
 
-  const availableGroups = (Object.keys(groupedPropDefs) as InspectorGroup[]).filter(
+  const availableGroups = INSPECTOR_GROUP_ORDER.filter(
     (group) => groupedPropDefs[group].length > 0
   );
   const defaultGroup = availableGroups[0] ?? "content";
@@ -876,7 +879,7 @@ export function BlockEditor({
       groups[inferInspectorGroup(propDef)].push(propDef);
     }
 
-    return (Object.keys(groups) as InspectorGroup[]).filter((group) => groups[group].length > 0).map((group) => ({
+    return INSPECTOR_GROUP_ORDER.filter((group) => groups[group].length > 0).map((group) => ({
       group,
       propDefs: groups[group],
     }));

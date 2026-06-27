@@ -9,6 +9,7 @@ const navigateMock = vi.fn();
 const lockGuardMock = vi.fn();
 const useQueryMock = vi.fn();
 const useMutationMock = vi.fn();
+const toastMock = vi.fn();
 let mutationStates: Array<{
   mutate: ReturnType<typeof vi.fn>;
   mutateAsync: ReturnType<typeof vi.fn>;
@@ -192,7 +193,7 @@ vi.mock("@/features/admin/cms/components/cms-image-upload", () => ({
 
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({
-    toast: vi.fn(),
+    toast: toastMock,
   }),
 }));
 
@@ -215,6 +216,12 @@ describe("CmsPageEditorPage", () => {
   beforeEach(() => {
     navigateMock.mockReset();
     lockGuardMock.mockReset();
+    toastMock.mockReset();
+    (globalThis as typeof globalThis & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver = class ResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
     editorLockState.isReadOnly = true;
     mutationStates = [];
     useQueryMock.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
@@ -347,6 +354,90 @@ describe("CmsPageEditorPage", () => {
           ],
         },
       })
+    );
+  });
+
+  it("saves SEO descriptions longer than 160 characters and root-relative canonicals", async () => {
+    editorLockState.isReadOnly = false;
+    root = createRoot(container);
+
+    await act(async () => {
+      root!.render(React.createElement(CmsPageEditorPage));
+    });
+
+    const seoTab = container.querySelector('[data-testid="tab-seo"]') as HTMLButtonElement | null;
+    expect(seoTab).not.toBeNull();
+
+    await act(async () => {
+      seoTab?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const seoDescription = container.querySelector('[data-testid="textarea-seo-description"]') as HTMLTextAreaElement | null;
+    const canonicalUrl = container.querySelector('[data-testid="input-canonical-url"]') as HTMLInputElement | null;
+    expect(seoDescription).not.toBeNull();
+    expect(canonicalUrl).not.toBeNull();
+
+    const longDescription = "A".repeat(180);
+    await act(async () => {
+      const setTextAreaValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+      setTextAreaValue?.call(seoDescription, longDescription);
+      seoDescription!.dispatchEvent(new Event("input", { bubbles: true }));
+      seoDescription!.dispatchEvent(new Event("change", { bubbles: true }));
+
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(canonicalUrl, "/");
+      canonicalUrl!.dispatchEvent(new Event("input", { bubbles: true }));
+      canonicalUrl!.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const saveButton = container.querySelector('[data-testid="button-save"]') as HTMLButtonElement | null;
+    await act(async () => {
+      saveButton?.click();
+    });
+
+    const updatePayload = mutationStates.flatMap((state) => state.mutate.mock.calls).at(-1)?.[0];
+    expect(updatePayload).toEqual(
+      expect.objectContaining({
+        seoDescription: longDescription,
+        canonicalUrl: "/",
+      }),
+    );
+  });
+
+  it("rejects invalid canonical URLs before saving and surfaces the validation message", async () => {
+    editorLockState.isReadOnly = false;
+    root = createRoot(container);
+
+    await act(async () => {
+      root!.render(React.createElement(CmsPageEditorPage));
+    });
+
+    const seoTab = container.querySelector('[data-testid="tab-seo"]') as HTMLButtonElement | null;
+    await act(async () => {
+      seoTab?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const canonicalUrl = container.querySelector('[data-testid="input-canonical-url"]') as HTMLInputElement | null;
+    expect(canonicalUrl).not.toBeNull();
+
+    await act(async () => {
+      const setInputValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setInputValue?.call(canonicalUrl, "not a url");
+      canonicalUrl!.dispatchEvent(new Event("input", { bubbles: true }));
+      canonicalUrl!.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const saveButton = container.querySelector('[data-testid="button-save"]') as HTMLButtonElement | null;
+    await act(async () => {
+      saveButton?.click();
+    });
+
+    expect(mutationStates.flatMap((state) => state.mutate.mock.calls)).toHaveLength(0);
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Must be a valid URL or root-relative path.",
+        variant: "destructive",
+      }),
     );
   });
 

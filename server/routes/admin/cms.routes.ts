@@ -1,27 +1,42 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { z } from "zod";
 import { storage } from "../../storage";
 import { paramString } from "../../utils/params";
 import { insertCmsPageSchema } from "@shared/schema";
 import { logger } from "../../utils/logger";
 import { createCmsPreviewToken } from "../../utils/cms-preview-token";
+import { stripSeedKeysFromCmsContent } from "@shared/cms-content";
+import { CANONICAL_URL_MESSAGE, isValidCanonicalUrl } from "@shared/cms-validation";
 
 const router = Router();
 
 const PAGE_TYPES = ["home", "about", "contact", "landing", "custom"] as const;
 const STATUSES = ["draft", "published", "scheduled", "archived"] as const;
 
-const createPageSchema = insertCmsPageSchema.extend({
+const pagePayloadSchema = insertCmsPageSchema.extend({
   title: z.string().min(1, "Title is required"),
   slug: z.string().min(1, "Slug is required").regex(/^[a-z0-9-/]+$/, "Slug must be lowercase with hyphens only"),
   pageType: z.enum(PAGE_TYPES).default("custom"),
   status: z.enum(STATUSES).default("draft"),
+  canonicalUrl: z.string().optional().nullable(),
+  seoDescription: z.string().optional().nullable(),
 });
 
-const updatePageSchema = createPageSchema.partial().extend({
+function validateCanonicalUrl<T extends z.ZodTypeAny>(schema: T) {
+  return schema.superRefine((data, ctx) => {
+    const canonicalUrl = (data as { canonicalUrl?: unknown }).canonicalUrl;
+    if (!isValidCanonicalUrl(canonicalUrl)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["canonicalUrl"], message: CANONICAL_URL_MESSAGE });
+    }
+  });
+}
+
+const createPageSchema = validateCanonicalUrl(pagePayloadSchema);
+
+const updatePageSchema = validateCanonicalUrl(pagePayloadSchema.partial().extend({
   title: z.string().min(1).optional(),
   slug: z.string().regex(/^[a-z0-9-/]+$/).optional(),
-});
+}));
 
 function normalizeSlug(slug: string): string {
   return slug.toLowerCase().trim().replace(/\s+/g, "-");
@@ -29,6 +44,15 @@ function normalizeSlug(slug: string): string {
 
 async function resolvePage(identifier: string) {
   return storage.cmsPages.getPageByIdOrSlug(identifier);
+}
+
+function sanitizeCmsPageData<T extends { content?: unknown }>(data: T): T {
+  if (!Object.prototype.hasOwnProperty.call(data, "content")) return data;
+  return { ...data, content: stripSeedKeysFromCmsContent(data.content) };
+}
+
+function getAdminId(req: Request) {
+  return (req as Request & { user?: { id?: string } }).user?.id ?? "";
 }
 
 router.get("/pages", async (req, res) => {
@@ -48,7 +72,7 @@ router.post("/pages", async (req, res) => {
       return res.status(400).json({ error: parsed.error.issues[0]?.message || "Validation failed" });
     }
 
-    const data = parsed.data;
+    const data = sanitizeCmsPageData(parsed.data);
     if (data.status === "scheduled") {
       return res.status(400).json({ error: "Use the /schedule endpoint to schedule a page" });
     }
@@ -59,7 +83,7 @@ router.post("/pages", async (req, res) => {
       return res.status(409).json({ error: "A page with this slug already exists" });
     }
 
-    const adminId = (req as any).user?.id;
+    const adminId = getAdminId(req);
     const page = await storage.cmsPages.createPage({
       ...data,
       slug,
@@ -131,7 +155,7 @@ router.put("/pages/:id", async (req, res) => {
       return res.status(400).json({ error: parsed.error.issues[0]?.message || "Validation failed" });
     }
 
-    const data = parsed.data;
+    const data = sanitizeCmsPageData(parsed.data);
     if (data.status === "scheduled" && page.status !== "scheduled") {
       return res.status(400).json({ error: "Use the /schedule endpoint to schedule a page" });
     }
@@ -143,7 +167,7 @@ router.put("/pages/:id", async (req, res) => {
       }
     }
 
-    const adminId = (req as any).user?.id;
+    const adminId = getAdminId(req);
 
     await storage.cmsPageRevisions.createRevision({
       pageId: page.id,
@@ -184,7 +208,7 @@ router.delete("/pages/:id", async (req, res) => {
 router.post("/pages/:id/publish", async (req, res) => {
   try {
     const id = paramString(req.params.id);
-    const adminId = (req as any).user?.id;
+    const adminId = getAdminId(req);
     const existingPage = await resolvePage(id);
     if (!existingPage) return res.status(404).json({ error: "Page not found" });
     const page = await storage.cmsPages.publishPage(existingPage.id, adminId);
@@ -199,7 +223,7 @@ router.post("/pages/:id/publish", async (req, res) => {
 router.post("/pages/:id/schedule", async (req, res) => {
   try {
     const id = paramString(req.params.id);
-    const adminId = (req as any).user?.id;
+    const adminId = getAdminId(req);
     const { scheduledAt } = req.body;
     if (!scheduledAt) {
       return res.status(400).json({ error: "scheduledAt is required" });
@@ -222,7 +246,7 @@ router.post("/pages/:id/schedule", async (req, res) => {
 router.post("/pages/:id/unpublish", async (req, res) => {
   try {
     const id = paramString(req.params.id);
-    const adminId = (req as any).user?.id;
+    const adminId = getAdminId(req);
     const existingPage = await resolvePage(id);
     if (!existingPage) return res.status(404).json({ error: "Page not found" });
     const page = await storage.cmsPages.unpublishPage(existingPage.id, adminId);
@@ -251,7 +275,7 @@ router.post("/pages/:pageId/revisions/:revisionId/restore", async (req, res) => 
   try {
     const pageId = paramString(req.params.pageId);
     const revisionId = paramString(req.params.revisionId);
-    const adminId = (req as any).user?.id;
+    const adminId = getAdminId(req);
 
     const page = await resolvePage(pageId);
     if (!page) return res.status(404).json({ error: "Page not found" });

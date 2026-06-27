@@ -75,6 +75,7 @@ import { useEditorLock } from "@/hooks/use-editor-lock";
 import { useLockConflictGuard } from "@/hooks/use-lock-conflict-guard";
 import { useEditorSaveState } from "@/hooks/use-editor-save-state";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
+import { CANONICAL_URL_MESSAGE, isValidCanonicalUrl } from "@shared/cms-validation";
 
 const editorSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -84,10 +85,10 @@ const editorSchema = z.object({
   sidebarId: z.string().default(""),
   status: z.enum(["draft", "published", "scheduled", "archived"]),
   seoTitle: z.string().optional(),
-  seoDescription: z.string().max(160, "Max 160 characters").optional(),
+  seoDescription: z.string().optional(),
   seoKeywords: z.string().optional(),
   ogImageUrl: z.string().optional(),
-  canonicalUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  canonicalUrl: z.string().optional().refine(isValidCanonicalUrl, CANONICAL_URL_MESSAGE),
   noindex: z.boolean().default(false),
 });
 
@@ -111,6 +112,19 @@ function parseBuilderContent(raw: unknown): BuilderContent {
     return { blocks: filterUnsupportedCmsBlocks(obj.blocks as BuilderContent["blocks"]) };
   }
   return EMPTY_CONTENT;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function firstFormErrorMessage(errors: Record<string, unknown>): string | null {
+  for (const value of Object.values(errors)) {
+    if (value && typeof value === "object" && "message" in value && typeof value.message === "string") {
+      return value.message;
+    }
+  }
+  return null;
 }
 
 export default function CmsPageEditorPage() {
@@ -209,7 +223,7 @@ export default function CmsPageEditorPage() {
   const watchStatus = form.watch("status");
   const watchTemplate = form.watch("template");
   const watchSidebarId = form.watch("sidebarId");
-  const hasFaqBlocks = (builderContent?.blocks ?? []).some((b: any) => b.type === "faq");
+  const hasFaqBlocks = (builderContent?.blocks ?? []).some((block) => block.type === "faq");
 
   useEffect(() => {
     if (isNew && !slugManuallyEdited.current && watchTitle !== titleRef.current) {
@@ -259,9 +273,8 @@ export default function CmsPageEditorPage() {
       saveState.markSaved();
       navTimerRef.current = setTimeout(() => navigate(`/admin/cms/pages/${created.id}`), 1500);
     },
-    onError: async (err: any) => {
-      const msg = await err?.response?.json?.().catch(() => null);
-      toast({ title: msg?.error || "Failed to create page", variant: "destructive" });
+    onError: (err: unknown) => {
+      toast({ title: getErrorMessage(err, "Failed to create page"), variant: "destructive" });
       saveState.markError();
     },
   });
@@ -294,9 +307,8 @@ export default function CmsPageEditorPage() {
       );
       saveState.markSaved();
     },
-    onError: async (err: any) => {
-      const msg = await err?.response?.json?.().catch(() => null);
-      toast({ title: msg?.error || "Failed to save page", variant: "destructive" });
+    onError: (err: unknown) => {
+      toast({ title: getErrorMessage(err, "Failed to save page"), variant: "destructive" });
       saveState.markError();
     },
   });
@@ -410,6 +422,10 @@ export default function CmsPageEditorPage() {
       } else {
         updateMutation.mutate(payload);
       }
+    }, (errors) => {
+      const message = firstFormErrorMessage(errors) || "Please fix the highlighted fields before saving.";
+      toast({ title: message, variant: "destructive" });
+      saveState.markError();
     })();
   };
 
@@ -1079,10 +1095,10 @@ export default function CmsPageEditorPage() {
                           <FormItem>
                             <FormLabel>Canonical URL <span className="text-muted-foreground font-normal text-xs">(optional)</span></FormLabel>
                             <FormControl>
-                              <Input placeholder="https://vivacms.com/about" autoPrependHttps {...field} data-testid="input-canonical-url" />
+                              <Input placeholder="/about or https://vivacms.com/about" {...field} data-testid="input-canonical-url" />
                             </FormControl>
                             <FormDescription className="text-xs">
-                              Override the canonical link tag. Leave blank to auto-generate from the page slug.
+                              Override the canonical link tag. Leave blank to auto-generate from the page slug. Use a full URL or root-relative path.
                             </FormDescription>
                             <FormMessage />
                           </FormItem>

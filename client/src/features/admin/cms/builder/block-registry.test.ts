@@ -28,4 +28,30 @@ describe("block registry compatibility helpers", () => {
       ]),
     );
   });
+
+  it("exposes reusable hero darkness and alignment controls", () => {
+    const hero = getBlockDef("hero");
+    expect(hero).toBeTruthy();
+    expect(hero?.defaultProps).toEqual(
+      expect.objectContaining({
+        backgroundImageOpacity: 55,
+        overlayOpacity: 30,
+        gradientEnabled: true,
+        gradientColor: "#102234",
+        gradientOpacity: 75,
+        gradientHeight: 40,
+        alignment: "center",
+      }),
+    );
+    expect(hero?.propDefs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "backgroundImageOpacity", type: "number", min: 0, max: 100 }),
+        expect.objectContaining({ key: "gradientEnabled", type: "boolean" }),
+        expect.objectContaining({ key: "gradientColor", type: "color" }),
+        expect.objectContaining({ key: "gradientOpacity", type: "number", min: 0, max: 100 }),
+        expect.objectContaining({ key: "gradientHeight", type: "number", min: 0, max: 100 }),
+        expect.objectContaining({ key: "alignment", type: "select" }),
+      ]),
+    );
+  });
 });

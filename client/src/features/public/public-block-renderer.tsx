@@ -66,43 +66,64 @@ function DynamicFallback() {
 function HeroBlock({ props }: { props: Record<string, unknown> }) {
   const bg = resolveCmsAssetUrl(str(props.backgroundImageUrl));
   const videoBg = str(props.videoBackgroundUrl);
-  const opacity = num(props.overlayOpacity as number, 50);
+  const overlayOpacity = num(props.overlayOpacity as number, 30);
   const overlayColor = normalizeHexColor(str(props.overlayColor)) || "#000000";
   const layout = str(props.layout) || "stacked";
+  const alignment = str(props.alignment) || (layout === "split" ? "left" : "center");
   const badge = str(props.badge);
   const accentHeading = str(props.accentHeading);
   const minH = str(props.minHeight) || "420";
   const minHeightStyle = minH === "100vh" ? "100vh" : `${minH}px`;
   const bgPosX = Math.max(0, Math.min(100, num(props.backgroundPositionX as number, 50)));
   const bgPosY = Math.max(0, Math.min(100, num(props.backgroundPositionY as number, 50)));
+  const imageOpacity = Math.max(0, Math.min(100, num(props.backgroundImageOpacity as number, 55))) / 100;
   const isSplit = layout === "split";
-  const overlayStrength = Math.max(0, Math.min(opacity, 100)) / 100;
+  const overlayStrength = Math.max(0, Math.min(overlayOpacity, 100)) / 100;
+  const gradientEnabled = props.gradientEnabled !== false;
+  const gradientColor = normalizeHexColor(str(props.gradientColor)) || "#102234";
+  const gradientOpacity = Math.max(0, Math.min(100, num(props.gradientOpacity as number, 75))) / 100;
+  const gradientHeight = Math.max(0, Math.min(100, num(props.gradientHeight as number, 40)));
   const sectionStyleConfig = getSectionStyleConfig(props, { resolveAssetUrl: resolveCmsAssetUrl });
   const overlayStyle = { backgroundColor: hexToRgba(overlayColor, overlayStrength) };
+  const gradientStyle = {
+    height: `${gradientHeight}%`,
+    background: `linear-gradient(to top, ${hexToRgba(gradientColor, gradientOpacity)}, ${hexToRgba(gradientColor, 0)})`,
+  };
   const headingTextStyle = colorStyle(props.headingColor);
   const accentHeadingTextStyle = colorStyle(props.accentHeadingColor);
   const subheadingTextStyle = colorStyle(props.subheadingColor);
+  const textAlignClass = alignment === "left" ? "text-left" : alignment === "right" ? "text-right" : "text-center";
+  const justifyClass = alignment === "left" ? "justify-start" : alignment === "right" ? "justify-end" : "justify-center";
+  const contentWidthClass = isSplit ? "max-w-2xl" : "max-w-3xl mx-auto";
+  const subheadingWidthClass = alignment === "center" ? "max-w-xl mx-auto" : alignment === "right" ? "max-w-xl ml-auto" : "max-w-xl";
 
   return (
     <section
-      className={`relative flex items-center overflow-hidden ${isSplit ? "justify-start text-left" : "justify-center text-center"}`}
+      className={`relative flex items-center overflow-hidden ${isSplit ? "justify-start" : "justify-center"} ${textAlignClass}`}
       style={{
         minHeight: minHeightStyle,
         ...(sectionStyleConfig.backgroundColor ? { backgroundColor: sectionStyleConfig.backgroundColor } : {}),
-        ...(bg && !videoBg
-          ? { backgroundImage: `url(${bg})`, backgroundSize: "cover", backgroundPosition: `${bgPosX}% ${bgPosY}%` }
-          : !videoBg && !sectionStyleConfig.backgroundColor
+        ...(!bg && !videoBg && !sectionStyleConfig.backgroundColor
           ? { background: DEFAULT_SECTION_LINEAR_GRADIENT }
           : {}),
       }}
     >
+      {bg && !videoBg && (
+        <img
+          src={bg}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: `${bgPosX}% ${bgPosY}%`, opacity: imageOpacity }}
+        />
+      )}
       {videoBg && (
-        <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover">
+        <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover" style={{ opacity: imageOpacity }}>
           <source src={videoBg} type="video/mp4" />
         </video>
       )}
       <div className="absolute inset-0" style={overlayStyle} />
-      <div className={`relative z-10 px-8 py-16 ${isSplit ? "max-w-2xl" : "max-w-3xl mx-auto"}`}>
+      {gradientEnabled && <div className="absolute inset-x-0 bottom-0" style={gradientStyle} />}
+      <div className={`relative z-10 px-8 py-16 ${contentWidthClass}`}>
         {badge && (
           <span className="inline-block px-3 py-1 rounded-full bg-accent/20 text-accent text-xs font-semibold mb-4 border border-accent/30">
             {badge}
@@ -119,12 +140,12 @@ function HeroBlock({ props }: { props: Record<string, unknown> }) {
         </h1>
         {str(props.subheading) && (
           <div
-            className={`text-lg text-white/80 mb-8 [&_a]:text-white [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:text-white/80 [&_p]:m-0 ${isSplit ? "" : "max-w-xl mx-auto"}`}
+            className={`text-lg text-white/80 mb-8 [&_a]:text-white [&_a]:underline [&_a]:underline-offset-2 [&_a]:hover:text-white/80 [&_p]:m-0 ${subheadingWidthClass}`}
             style={subheadingTextStyle}
             dangerouslySetInnerHTML={{ __html: str(props.subheading) }}
           />
         )}
-        <div className={`flex flex-wrap gap-3 ${isSplit ? "justify-start" : "justify-center"}`}>
+        <div className={`flex flex-wrap gap-3 ${justifyClass}`}>
           {str(props.ctaText) && (
             <FormModalButton
               label={str(props.ctaText)}
@@ -158,7 +179,7 @@ function HeroBlock({ props }: { props: Record<string, unknown> }) {
       </div>
       {isSplit && bg && (
         <div className="hidden md:block absolute right-0 top-0 bottom-0 w-1/3">
-          <img src={bg} alt="" className="w-full h-full object-cover" />
+          <img src={bg} alt="" className="w-full h-full object-cover" style={{ objectPosition: `${bgPosX}% ${bgPosY}%`, opacity: imageOpacity }} />
         </div>
       )}
     </section>
