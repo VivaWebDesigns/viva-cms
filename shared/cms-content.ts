@@ -37,6 +37,10 @@ function sameBlockIdentity(existing: Record<string, unknown>, seeded: Record<str
   return false;
 }
 
+function isBlankMediaValue(value: unknown) {
+  return value === undefined || value === null || value === "";
+}
+
 function syncMediaFields(
   existing: Record<string, unknown>,
   seeded: Record<string, unknown>,
@@ -45,7 +49,7 @@ function syncMediaFields(
   const next: Record<string, unknown> = { ...existing };
 
   for (const field of APPROVED_MEDIA_FIELDS) {
-    if (typeof seeded[field] === "string" && seeded[field] !== existing[field]) {
+    if (typeof seeded[field] === "string" && isBlankMediaValue(existing[field])) {
       next[field] = seeded[field];
       changed = true;
     }
@@ -75,10 +79,9 @@ export function syncSeedMediaReferences<T>(existingContent: T, seededContent: un
 
   let changed = false;
   const usedSeedIndexes = new Set<number>();
-  const nextBlocks = existingBlocks.map((existingBlock, index) => {
+  const nextBlocks = existingBlocks.map((existingBlock) => {
     const matchingSeedIndex = seededBlocks.findIndex((seededBlock, seededIndex) => {
       if (usedSeedIndexes.has(seededIndex)) return false;
-      if (seededIndex === index && seededBlock.type === existingBlock.type) return true;
       return sameBlockIdentity(existingBlock, seededBlock);
     });
 
