@@ -23,6 +23,15 @@ const app = express();
 app.set("trust proxy", 1);
 const httpServer = createServer(app);
 
+// Railway service URLs are previews (this template has no public domain), so search
+// engines must never index them. Sites built from this template inherit the rule.
+app.use((req, res, next) => {
+  if (req.hostname.toLowerCase().endsWith(".up.railway.app")) {
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  }
+  next();
+});
+
 app.use(securityHeaders());
 app.use(requestIdMiddleware);
 
